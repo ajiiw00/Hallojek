@@ -1,0 +1,118 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the Hallojek platform.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique identifier for the user." },
+        "displayName": { "type": "string", "description": "The user's full name." },
+        "email": { "type": "string", "format": "email", "description": "The user's email address." },
+        "phoneNumber": { "type": "string", "description": "The user's phone number." },
+        "role": { "type": "string", "enum": ["customer", "rider", "seller", "admin"], "description": "The user's role." },
+        "balance": { "type": "number", "description": "The user's current wallet balance." },
+        "preferredLanguage": { "type": "string", "enum": ["id", "zh", "en", "th", "vi"], "description": "The user's preferred language." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the user account was created." }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Driver": {
+      "title": "Driver",
+      "description": "A driver on the Hallojek platform.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique identifier for the driver." },
+        "vehicleType": { "type": "string", "enum": ["motorcycle", "car"], "description": "The type of vehicle." },
+        "vehiclePlate": { "type": "string", "description": "The vehicle's license plate." },
+        "status": { "type": "string", "enum": ["online", "offline", "busy"], "description": "The driver's current status." },
+        "rating": { "type": "number", "description": "The driver's average rating." },
+        "currentLocation": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" }
+          }
+        }
+      },
+      "required": ["uid", "vehicleType", "status"]
+    },
+    "Ride": {
+      "title": "Ride",
+      "description": "A ride-hailing request.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clientId": { "type": "string" },
+        "driverId": { "type": "string" },
+        "pickupLocation": {
+          "type": "object",
+          "properties": {
+            "address": { "type": "string" },
+            "lat": { "type": "number" },
+            "lng": { "type": "number" }
+          }
+        },
+        "destination": {
+          "type": "object",
+          "properties": {
+            "address": { "type": "string" },
+            "lat": { "type": "number" },
+            "lng": { "type": "number" }
+          }
+        },
+        "status": { "type": "string", "enum": ["requested", "accepted", "ongoing", "completed", "cancelled"] },
+        "fare": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["cash", "hallopay"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["clientId", "pickupLocation", "destination", "status", "fare"]
+    },
+    "FoodOrder": {
+      "title": "Food Order",
+      "description": "A food delivery order.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clientId": { "type": "string" },
+        "restaurantId": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "quantity": { "type": "number" },
+              "price": { "type": "number" }
+            }
+          }
+        },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "preparing", "delivering", "completed", "cancelled"] },
+        "deliveryAddress": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["clientId", "restaurantId", "items", "totalAmount", "status"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "A financial transaction in Hallopay.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["topup", "payment", "refund"] },
+        "amount": { "type": "number" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "type", "amount", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": { "schema": "User", "description": "User profiles." },
+    "/drivers/{driverId}": { "schema": "Driver", "description": "Driver details and status." },
+    "/rides/{rideId}": { "schema": "Ride", "description": "Ride-hailing records." },
+    "/foodOrders/{orderId}": { "schema": "FoodOrder", "description": "Food delivery orders." },
+    "/transactions/{transactionId}": { "schema": "Transaction", "description": "Wallet transaction history." }
+  }
+}

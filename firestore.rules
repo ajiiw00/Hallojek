@@ -1,0 +1,176 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (auth.uid)
+    // Fields:
+    //   - uid: string (required) - The unique identifier for the user.
+    //   - displayName: string (optional) - The user's full name.
+    //   - email: string (required, email format) - The user's email address.
+    //   - phoneNumber: string (optional) - The user's phone number.
+    //   - role: string (required, enum: ['customer', 'rider', 'seller', 'admin']) - The user's role.
+    //   - balance: number (optional) - The user's current wallet balance.
+    //   - preferredLanguage: string (optional, enum: ['id', 'zh', 'en', 'th', 'vi']) - The user's preferred language.
+    //   - createdAt: string (required, ISO 8601) - When the user account was created.
+    //
+    // Collection: drivers
+    // Document ID: driverId (auth.uid)
+    // Fields:
+    //   - uid: string (required) - The unique identifier for the driver.
+    //   - vehicleType: string (required, enum: ['motorcycle', 'car']) - The type of vehicle.
+    //   - vehiclePlate: string (required) - The vehicle's license plate.
+    //   - status: string (required, enum: ['online', 'offline', 'busy']) - The driver's current status.
+    //   - rating: number (optional) - The driver's average rating.
+    //   - currentLocation: map (optional) - The driver's current location.
+    //
+    // Collection: rides
+    // Document ID: rideId (auto-generated)
+    // Fields:
+    //   - clientId: string (required) - The user who requested the ride.
+    //   - driverId: string (optional) - The driver who accepted the ride.
+    //   - pickupLocation: map (required) - Pickup address and coordinates.
+    //   - destination: map (required) - Destination address and coordinates.
+    //   - status: string (required, enum: ['requested', 'accepted', 'ongoing', 'completed', 'cancelled'])
+    //   - fare: number (required) - The estimated or final fare.
+    //   - paymentMethod: string (required, enum: ['cash', 'hallopay'])
+    //   - createdAt: string (required, ISO 8601)
+    //
+    // Collection: foodOrders
+    // Document ID: orderId (auto-generated)
+    // Fields:
+    //   - clientId: string (required) - The user who placed the order.
+    //   - restaurantId: string (required) - The restaurant ID.
+    //   - items: list (required) - List of items ordered.
+    //   - totalAmount: number (required) - Total amount of the order.
+    //   - status: string (required, enum: ['pending', 'preparing', 'delivering', 'completed', 'cancelled'])
+    //   - deliveryAddress: string (required)
+    //   - createdAt: string (required, ISO 8601)
+    //
+    // Collection: transactions
+    // Document ID: transactionId (auto-generated)
+    // Fields:
+    //   - userId: string (required) - The user involved in the transaction.
+    //   - type: string (required, enum: ['topup', 'payment', 'refund'])
+    //   - amount: number (required) - The transaction amount.
+    //   - description: string (optional)
+    //   - createdAt: string (required, ISO 8601)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+        (request.auth.token.email == "dianpurnomoaji00@gmail.com" && request.auth.token.email_verified == true)
+      );
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidUser(data) {
+      return data.uid is string && data.uid.size() > 0 &&
+             data.email is string && isValidEmail(data.email) &&
+             data.role in ['customer', 'rider', 'seller', 'admin'] &&
+             isValidDateString(data.createdAt);
+    }
+
+    function isValidDriver(data) {
+      return data.uid is string && data.uid.size() > 0 &&
+             data.vehicleType in ['motorcycle', 'car'] &&
+             data.status in ['online', 'offline', 'busy'];
+    }
+
+    function isValidRide(data) {
+      return data.clientId is string &&
+             data.pickupLocation is map &&
+             data.destination is map &&
+             data.status in ['requested', 'accepted', 'ongoing', 'completed', 'cancelled'] &&
+             data.fare is number &&
+             data.paymentMethod in ['cash', 'hallopay'] &&
+             isValidDateString(data.createdAt);
+    }
+
+    function isValidFoodOrder(data) {
+      return data.clientId is string &&
+             data.restaurantId is string &&
+             data.items is list &&
+             data.totalAmount is number &&
+             data.status in ['pending', 'preparing', 'delivering', 'completed', 'cancelled'] &&
+             data.deliveryAddress is string &&
+             isValidDateString(data.createdAt);
+    }
+
+    function isValidTransaction(data) {
+      return data.userId is string &&
+             data.type in ['topup', 'payment', 'refund'] &&
+             data.amount is number &&
+             isValidDateString(data.createdAt);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role in ['customer', 'rider', 'seller'] || isAdmin());
+      allow update: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    match /drivers/{driverId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isOwner(driverId) && isValidDriver(request.resource.data);
+      allow update: if isAuthenticated() && isOwner(driverId) && isValidDriver(request.resource.data);
+    }
+
+    match /rides/{rideId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.clientId || request.auth.uid == resource.data.driverId || isAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.clientId && isValidRide(request.resource.data);
+      allow update: if isAuthenticated() && (request.auth.uid == resource.data.clientId || request.auth.uid == resource.data.driverId || isAdmin()) && isValidRide(request.resource.data);
+    }
+
+    match /foodOrders/{orderId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.clientId || isAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.clientId && isValidFoodOrder(request.resource.data);
+      allow update: if isAuthenticated() && (request.auth.uid == resource.data.clientId || isAdmin()) && isValidFoodOrder(request.resource.data);
+    }
+
+    match /transactions/{transactionId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isAuthenticated() && isOwner(request.resource.data.userId) && isValidTransaction(request.resource.data);
+      allow update: if false; // Transactions are immutable
+    }
+
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

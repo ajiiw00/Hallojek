@@ -1,0 +1,7 @@
+{
+  "name": "Remix: Remix: Remix: Hallojek",
+  "description": "A super app for Taiwan targeting Indonesian migrant workers and locals, offering ride-hailing, food delivery, and digital wallet services.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
